@@ -1,14 +1,17 @@
-# Welcome to your CDK TypeScript project
+# Bienvenido a la aplicación RKT-Almacenes-Reguladores (Infraestructura)
 
-This is a blank project for CDK development with TypeScript.
+Esta parte de la aplicación sirve para definir la infraestructura de la App gestionar los almacenes reguladores de la empresa RIKUTEC en diferentes ciudades claves logísiticamente.
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+# Aplicación Web asociada: Rkt-regulador2-frontend
+GitHub: https://github.com/GeorgeBeta/rkt-regulador2-frontend
 
-## Useful commands
+# Estructura de la Infraestructura
+Esta aplicación la estoy desarrollando con visual studio code con CDK y la librería AWS Amplify Construct Library
 
-* `npm run build`   compile typescript to js
-* `npm run watch`   watch for changes and compile
-* `npm run test`    perform the jest unit tests
-* `npx cdk deploy`  deploy this stack to your default AWS account/region
-* `npx cdk diff`    compare deployed stack with current state
-* `npx cdk synth`   emits the synthesized CloudFormation template
+## Comandos
+# Instalar dependencias
+npm install
+
+# Despliegue en la nube AWS CloudFormation
+cdk deploy
+
