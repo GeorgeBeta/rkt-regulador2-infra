@@ -12,6 +12,10 @@ Esta aplicación la estoy desarrollando con visual studio code con CDK y la libr
 # Instalar dependencias
 npm install
 
+# Stacks
+* RktRegulador2CognitoStack
+* RktRegulador2AppAmplifyHostingStack
+
 # Despliegue en la nube AWS CloudFormation
-cdk deploy
+cdk deploy --all
 
