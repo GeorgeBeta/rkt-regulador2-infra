@@ -1,5 +1,19 @@
 const { v4: uuidv4 } = require('uuid');
 
+const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+const { 
+  DynamoDBDocumentClient, 
+  QueryCommand, 
+  PutCommand,
+  DeleteCommand
+} = require("@aws-sdk/lib-dynamodb");
+
+const client = new DynamoDBClient({});
+const docClient = DynamoDBDocumentClient.from(client);
+
+const TABLE_NAME = process.env.TABLE_NAME;
+const INDEX_NAME = process.env.INDEX_NAME;
+
 export const handler = async (event: any = {}): Promise<any> => {
     console.log('Request received:', event);
 
@@ -26,7 +40,9 @@ export const handler = async (event: any = {}): Promise<any> => {
                     return createNewItem(body.filePdfName, userId);
                 }
             case 'DELETE':
-            // TO IMPLEMENT
+                // Handle DELETE /filepdfs/{id} (delete specific filepdf)
+                console.log('delete method');  
+                return deleteItem(event.pathParameters.id)
             case 'PATCH':
             // TO IMPLEMENT
             default:
@@ -40,8 +56,27 @@ export const handler = async (event: any = {}): Promise<any> => {
 
 async function getAllItems(id: string) {
     console.log('get all items');
-     
-     const fakeItems = [
+    
+       //Get all items
+    const params = {
+        TableName: TABLE_NAME,
+        KeyConditionExpression: 'userId = :userId',
+        ExpressionAttributeValues: {
+          ':userId': id
+        },
+    };
+    
+    console.log(params);
+ 
+    const getCommand = new QueryCommand(params);
+    const getResponse = await docClient.send(getCommand);
+
+    if (!getResponse.Items) {
+        return createResponse(404, 'Item not found')
+    }
+
+
+    /* const fakeItems = [
          {
              userId: id,
              createdAt: Date.now().toString(),
@@ -56,9 +91,9 @@ async function getAllItems(id: string) {
              filePdfName: 'PV1234569',
              completed: false
          }
-     ]
+     ] */
  
-     return createResponse(200, fakeItems)
+     return createResponse(200, getResponse.Items)
 }
 
 async function createNewItem(fileName: string, userId: string) {
@@ -73,9 +108,72 @@ async function createNewItem(fileName: string, userId: string) {
     }
   
     // FAKE IT
-  
+    const params = {
+        TableName: TABLE_NAME,
+        Item: {
+          userId: newItem.userId,
+          createdAt: newItem.createdAt,
+          filePdfId: newItem.filePdfId,
+          filePDFName: newItem.filePDFName,
+          completed: newItem.completed
+        }
+    };
+
+    console.log(params);
+    const putCommand = new PutCommand(params);
+    await docClient.send(putCommand);
+
     return createResponse(200, newItem)
 }
+
+async function getItemFromGSI(filePdfId: string) {
+    console.log('get item from GSI');
+
+    const queryParams = {
+        TableName: TABLE_NAME,
+        IndexName: INDEX_NAME,
+        KeyConditionExpression: 'filePdfId = :filePdfId',
+        ExpressionAttributeValues: {
+            ':filePdfId': filePdfId
+        },
+    };
+
+    console.log(queryParams);
+    const queryCommand = new QueryCommand(queryParams);
+    const queryResponse = await docClient.send(queryCommand);
+
+    if (!queryResponse.Items || queryResponse.Items.length === 0) {
+        return createResponse(404, 'Item not found')
+    }
+
+    return queryResponse.Items[0]
+}
+
+async function deleteItem(filePdfId: string) {
+    console.log('delete item');
+
+    // First we find this item in the GSI
+    const item = await getItemFromGSI(filePdfId);
+
+    const itemKey = {
+        userId: item.userId,
+        createdAt: item.createdAt
+    }
+
+    // Then we delete the item
+    const deleteParams = {
+        TableName: TABLE_NAME,
+        Key: itemKey
+    };
+
+    console.log(deleteParams);
+
+    const deleteCommand = new DeleteCommand(deleteParams);
+    await docClient.send(deleteCommand);
+
+    return createResponse(200, itemKey)
+}
+
 
 function createResponse(statusCode: number, body: any) {
     console.log('create response');

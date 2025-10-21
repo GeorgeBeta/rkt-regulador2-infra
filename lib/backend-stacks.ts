@@ -4,12 +4,47 @@ import { Construct } from "constructs";
 import path = require("path");
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import { AttributeType, BillingMode, GlobalSecondaryIndexProps, Table } from "aws-cdk-lib/aws-dynamodb";
+import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
+
 
 export class BackendStack extends Stack {
     public readonly apiUrl: CfnOutput;
 
     constructor(scope: Construct, id: string, props: StackProps) {
         super(scope, id, props);
+
+        /* Item schema:
+        filepdf: {
+            userId: string,
+            createdAt: string,
+            filePdfId: string,
+            filePdfName: string,
+            completed: boolean
+        }
+        */
+        // Creamos un segundo índice de la base de datos
+        const filesPDFTable = new Table(this, `RktRikutec2FilesPDFTableDynamoDB`, {
+            partitionKey: {
+                name: 'userId',
+                type: AttributeType.STRING,
+            },
+            sortKey: {
+                name: 'createdAt',
+                type: AttributeType.STRING,
+            },
+            billingMode: BillingMode.PAY_PER_REQUEST,
+        });
+
+        const gsi1: GlobalSecondaryIndexProps = {
+            indexName: 'filePdfId-index',
+            partitionKey: {
+                name: 'filePdfId',
+                type: AttributeType.STRING,
+            },
+        };
+
+        filesPDFTable.addGlobalSecondaryIndex(gsi1);
 
         // Backend function
         const backendFunction = new NodejsFunction(this, 'RktRegulador2BackendFunction', {
@@ -27,9 +62,26 @@ export class BackendStack extends Stack {
             },
 
             environment: {
-                //Add environment variables if needed
+                TABLE_NAME: filesPDFTable.tableName,
+                INDEX_NAME: gsi1.indexName
             }
         });
+
+        // Give permissions to the function to access the dynamodb table FilesPDF
+        backendFunction.addToRolePolicy(new PolicyStatement({
+            effect: Effect.ALLOW,
+            actions: [
+            'dynamodb:PutItem',
+            'dynamodb:Query',
+            'dynamodb:DeleteItem'
+
+            ],
+            resources: [
+                filesPDFTable.tableArn,
+                `${filesPDFTable.tableArn}/index/*`
+            ]
+        }));
+
 
         // Create API Gateway
         const backendApi = new apigateway.RestApi(this, 'RktRegulador2APIGatewayFiles', {
@@ -45,6 +97,14 @@ export class BackendStack extends Stack {
         filesPdf.addMethod('GET', integration);
         filesPdf.addMethod('POST', integration);
     
+        // Add /filepdfs/{id} resource
+        const filepdfsWithId = filesPdf.addResource('{id}');
+        filepdfsWithId.addMethod('DELETE', integration, { // DELETE /filepdfs/{id}
+            requestParameters: {
+                'method.request.path.id': true  // Makes the id parameter required
+            }
+        });
+
         // Output the API Gateway URL
         this.apiUrl = new CfnOutput(this, 'RktRegulador2APIfilesPdf', {
             value: backendApi.url,
