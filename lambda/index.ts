@@ -1,8 +1,10 @@
 const { v4: uuidv4 } = require('uuid');
 
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+
 const { 
-  DynamoDBDocumentClient, 
+  DynamoDBDocumentClient,
+  ScanCommand,
   QueryCommand, 
   PutCommand,
   DeleteCommand
@@ -25,19 +27,19 @@ export const handler = async (event: any = {}): Promise<any> => {
         console.log(path);
 
          //FAKE USER ID
-         const userId = 'MR_FAKE';
+        const userId = 'MR_FAKE';
 
          switch (httpMethod) {
             case 'GET':
                 console.log('GET all FilePDFs');
                 if (path === '/filepdfs') {
-                    return getAllItems(userId);
+                    return getAllItems();
                 }
             case 'POST':
                 console.log('POST a new FilePDF');
                 if (path === '/filepdfs') {
                     const body = JSON.parse(event.body);
-                    return createNewItem(body.filePdfName, userId);
+                    return createNewItem(body.filePdfName, body.userId);
                 }
             case 'DELETE':
                 // Handle DELETE /filepdfs/{id} (delete specific filepdf)
@@ -54,47 +56,26 @@ export const handler = async (event: any = {}): Promise<any> => {
     }
 }
 
-async function getAllItems(id: string) {
+async function getAllItems() {
     console.log('get all items');
     
-       //Get all items
     const params = {
-        TableName: TABLE_NAME,
-        KeyConditionExpression: 'userId = :userId',
-        ExpressionAttributeValues: {
-          ':userId': id
-        },
+        TableName: TABLE_NAME
     };
     
     console.log(params);
  
-    const getCommand = new QueryCommand(params);
-    const getResponse = await docClient.send(getCommand);
+    const scanCommand = new ScanCommand(params);
+    const scanResponse = await docClient.send(scanCommand);
 
-    if (!getResponse.Items) {
-        return createResponse(404, 'Item not found')
+    if (!scanResponse.Items) {
+        return createResponse(404, 'Items not found')
     }
-
-
-    /* const fakeItems = [
-         {
-             userId: id,
-             createdAt: Date.now().toString(),
-             filePdfId: '123',
-             filePdfName: 'PV3211234',
-             completed: false
-         },
-         {
-             userId: id,
-             createdAt: Date.now().toString(),
-             filePdfId: '456',
-             filePdfName: 'PV1234569',
-             completed: false
-         }
-     ] */
  
-     return createResponse(200, getResponse.Items)
+     return createResponse(200, scanResponse.Items)
 }
+
+
 
 async function createNewItem(fileName: string, userId: string) {
     console.log('create new item');
@@ -182,6 +163,10 @@ function createResponse(statusCode: number, body: any) {
       statusCode: statusCode,
       headers: {
         "Content-Type": "application/json",
+        'Access-Control-Allow-Origin': '*', // Restrict this in production
+        'Access-Control-Allow-Credentials': true,
+        'Access-Control-Allow-Headers':  'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token',
+        'Access-Control-Allow-Methods': 'GET,POST,DELETE,PATCH,OPTIONS'
       },
       body: JSON.stringify(body)
     }
