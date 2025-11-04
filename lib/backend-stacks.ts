@@ -6,12 +6,17 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import { AttributeType, BillingMode, GlobalSecondaryIndexProps, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
+import { UserPool } from "aws-cdk-lib/aws-cognito";
+
+interface BackendStackProps extends StackProps {
+    readonly userPoolArn: string;
+}
 
 
 export class BackendStack extends Stack {
     public readonly apiUrl: CfnOutput;
 
-    constructor(scope: Construct, id: string, props: StackProps) {
+    constructor(scope: Construct, id: string, props: BackendStackProps) {
         super(scope, id, props);
 
         /* Item schema:
@@ -82,7 +87,6 @@ export class BackendStack extends Stack {
             ]
         }));
 
-
         // Create API Gateway
         const backendApi = new apigateway.RestApi(this, 'RktRegulador2APIGatewayFiles', {
             restApiName: 'RktRegulador2BackendAPI',
@@ -102,17 +106,31 @@ export class BackendStack extends Stack {
             }
         });
 
+        const userPool = UserPool.fromUserPoolArn(this, 'ImportedUserPool', props.userPoolArn);
+
+        // Create authorizers
+        const authorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'TodoWebAppAuthorizer', {
+            cognitoUserPools: [userPool]
+        });
+
+       // Create method options with authorization
+        const methodOptions: apigateway.MethodOptions = {
+            authorizer: authorizer,
+            authorizationType: apigateway.AuthorizationType.COGNITO
+        };
+
          // Create an API Gateway resource and method
          const integration = new apigateway.LambdaIntegration(backendFunction);
 
          //Add resources and methods
         const filesPdf = backendApi.root.addResource('filepdfs');
-        filesPdf.addMethod('GET', integration);
-        filesPdf.addMethod('POST', integration);
+        filesPdf.addMethod('GET', integration, methodOptions);
+        filesPdf.addMethod('POST', integration, methodOptions);
     
         // Add /filepdfs/{id} resource
         const filepdfsWithId = filesPdf.addResource('{id}');
         filepdfsWithId.addMethod('DELETE', integration, { // DELETE /filepdfs/{id}
+            ...methodOptions,
             requestParameters: {
                 'method.request.path.id': true  // Makes the id parameter required
             }
