@@ -27,7 +27,7 @@ export const handler = async (event: any = {}): Promise<any> => {
         console.log(path);
 
         // Get Cognito user information from thee event
-        const userId = event.requestContext.authorizer?.claims['cognito:username'];
+        // const userId = event.requestContext.authorizer?.claims['cognito:username'];
 
          switch (httpMethod) {
             case 'GET':
