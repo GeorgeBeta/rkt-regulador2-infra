@@ -7,11 +7,15 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import { AttributeType, BillingMode, GlobalSecondaryIndexProps, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { UserPool } from "aws-cdk-lib/aws-cognito";
+import { Certificate, CertificateValidation } from "aws-cdk-lib/aws-certificatemanager";
+import { ARecord, RecordTarget, HostedZone } from "aws-cdk-lib/aws-route53";
+import { ApiGatewayDomain } from "aws-cdk-lib/aws-route53-targets";
 
 interface BackendStackProps extends StackProps {
     readonly userPoolArn: string;
+    readonly apiDomainName: string;
+    readonly hostedZoneDomain: string;
 }
-
 
 export class BackendStack extends Stack {
     public readonly apiUrl: CfnOutput;
@@ -106,9 +110,41 @@ export class BackendStack extends Stack {
             }
         });
 
-        const userPool = UserPool.fromUserPoolArn(this, 'ImportedUserPool', props.userPoolArn);
+        // Custom Domain Configuration
+        const domainName = props.apiDomainName;
+
+        // Get the hosted zone for your domain
+        const hostedZone = HostedZone.fromLookup(this, 'TestHostedZone', {
+            domainName: props.hostedZoneDomain,
+        });
+
+        // Create SSL certificate in current region for regional endpoint
+        const certificate = new Certificate(this, 'TestApiCertificate', {
+            domainName: domainName,
+            validation: CertificateValidation.fromDns(hostedZone),
+        });
+
+        // Create custom domain for API Gateway (regional endpoint)
+        const customDomain = new apigateway.DomainName(this, 'TestCustomDomain', {
+            domainName: domainName,
+            certificate: certificate,
+            endpointType: apigateway.EndpointType.REGIONAL,
+        });
+
+        // Map the custom domain to the API
+        customDomain.addBasePathMapping(backendApi);
+
+        // Create Route53 record
+        new ARecord(this, 'ApiAliasRecord', {
+            zone: hostedZone,
+            recordName: 'test',
+            target: RecordTarget.fromAlias(
+                new ApiGatewayDomain(customDomain)
+            ),
+        });
 
         // Create authorizers
+        const userPool = UserPool.fromUserPoolArn(this, 'ImportedUserPool', props.userPoolArn);
         const authorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'TodoWebAppAuthorizer', {
             cognitoUserPools: [userPool]
         });
@@ -138,7 +174,7 @@ export class BackendStack extends Stack {
 
         // Output the API Gateway URL
         this.apiUrl = new CfnOutput(this, 'RktRegulador2APIfilesPdf', {
-            value: backendApi.url,
+            value: `https://${domainName}/`,
             description: 'API Gateway URL para la parte de gestión de las ficheros PDFs'
         });
     }

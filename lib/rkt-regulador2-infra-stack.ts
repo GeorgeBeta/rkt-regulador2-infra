@@ -11,6 +11,8 @@ interface AmplifyStackProps extends StackProps {
 	readonly userPoolClientId: string;
 	readonly identityPoolId: string;
 	readonly serverURL: string;
+	readonly customDomain?: string;
+	readonly certificateArn?: string;
 }
 
 
@@ -51,6 +53,19 @@ export class AmplifyHostingStack extends Stack {
 			target: '/index.html',
 			status: RedirectStatus.REWRITE,
 		});
+
+        // Add custom domain if provided
+        if (props.customDomain && props.certificateArn) {
+            const domain = amplifyApp.addDomain(props.customDomain, {
+                subDomains: [
+                    {
+                        branch: main,
+                        prefix: 'rkt-regulador'
+                    }
+                ]
+            });
+        }
+
         // Agregamos un par de salidas de transformación que se mostrarán en la terminal cuando se implemente 
         // la aplicación. También usaremos esto más adelante para pasar información entre stacks
         new CfnOutput(this, 'AmplifyAppName', {
