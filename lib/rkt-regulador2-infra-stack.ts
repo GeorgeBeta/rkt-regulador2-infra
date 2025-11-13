@@ -60,7 +60,7 @@ export class AmplifyHostingStack extends Stack {
                 subDomains: [
                     {
                         branch: main,
-                        prefix: 'rkt-regulador'
+                        prefix: 'almacenes'
                     }
                 ]
             });
