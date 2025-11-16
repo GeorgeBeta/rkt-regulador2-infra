@@ -5,6 +5,7 @@ import { AmplifyHostingStack } from '../lib/rkt-regulador2-infra-stack';
 import { CognitoStack } from '../lib/cognito-stacks';
 import { BackendStack } from '../lib/backend-stacks';
 import { CertificateStack } from '../lib/certificate-stack';
+import { CloudWatchStack } from '../lib/cloudwatch-stack';
 
 const app = new cdk.App()
 
@@ -46,4 +47,10 @@ const amplifyStack = new AmplifyHostingStack(app, 'RktRegulador2AppAmplifyHostin
     serverURL: backendStack.apiUrl.value,
     customDomain: hostedZoneDomain,
     certificateArn: certificateStack.certificateArn.value
+});
+
+const cloudWatchStack = new CloudWatchStack(app, 'RktRegulador2-AppCloudWatchStack', {
+    env,
+    amplifyAppId: amplifyStack.amplifyAppId.value,
+    functionName: backendStack.lambdaFunctionName.value
 });

@@ -19,6 +19,7 @@ interface BackendStackProps extends StackProps {
 
 export class BackendStack extends Stack {
     public readonly apiUrl: CfnOutput;
+    public readonly lambdaFunctionName: CfnOutput;
 
     constructor(scope: Construct, id: string, props: BackendStackProps) {
         super(scope, id, props);
@@ -176,6 +177,11 @@ export class BackendStack extends Stack {
         this.apiUrl = new CfnOutput(this, 'RktRegulador2APIfilesPdf', {
             value: `https://${domainName}/`,
             description: 'API Gateway URL para la parte de gestión de las ficheros PDFs'
+        });
+
+        this.lambdaFunctionName = new CfnOutput(this, 'Rkt-regulador2-WebAppBackendFunctionName', {
+            value: backendFunction.functionName,
+            description: 'Backend Lambda Function Name'
         });
     }
 }
